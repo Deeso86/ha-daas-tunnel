@@ -1,8 +1,18 @@
-FROM alpine:3.20
+#!/bin/sh
+set -e
 
-RUN apk add --no-cache autossh openssh jq
+SERVER=$(jq -r '.server' /data/options.json)
+USER=$(jq -r '.user' /data/options.json)
+PORT=$(jq -r '.remote_port' /data/options.json)
 
-COPY run.sh /run.sh
-RUN chmod +x /run.sh
+echo "Starting DAAS tunnel to $SERVER on port $PORT"
 
-CMD ["/run.sh"]
+exec autossh \
+  -M 0 \
+  -N \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o ExitOnForwardFailure=yes \
+  -o StrictHostKeyChecking=no \
+  -R 127.0.0.1:${PORT}:localhost:8123 \
+  ${USER}@${SERVER}
