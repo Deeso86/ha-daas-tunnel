@@ -1,0 +1,23 @@
+name: DAAS Tunnel
+version: "1.0.0"
+slug: daas_tunnel
+description: Persistent outbound tunnel to DAAS cloud
+
+architecture:
+  - aarch64
+  - amd64
+
+startup: services
+boot: auto
+init: false
+host_network: true
+
+options:
+  server: ""
+  user: ""
+  remote_port: 0
+
+schema:
+  server: str
+  user: str
+  remote_port: int
