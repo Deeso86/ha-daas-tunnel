@@ -1,4 +1,20 @@
 #!/bin/sh
+log() {
+  local level="$1"; shift
+  local event="$1"; shift
+  local msg="$1"; shift
+
+  # Optional k=v pairs after msg
+  local kv=""
+  while [ $# -gt 0 ]; do
+    kv="$kv,\"$1\":\"$2\""
+    shift 2
+  done
+
+  echo "{\"ts\":\"$(date -Is)\",\"level\":\"$level\",\"component\":\"daas_tunnel\",\"event\":\"$event\",\"msg\":\"$msg\"$kv}"
+}
+
+
 set -e
 
 KEY_PATH="/data/ssh/id_ed25519"
