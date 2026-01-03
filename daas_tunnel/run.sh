@@ -85,28 +85,37 @@ while true; do
   attempt=$((attempt + 1))
   log INFO ssh_connecting "Attempting SSH tunnel" attempt "$attempt" backoff_sec "$backoff"
 
-  run_ssh 2> >(while IFS= read -r line; do
-    case "$line" in
-      *"Permission denied (publickey)"*)
-        log ERROR ssh_auth_failed "$line" action "install_public_key_on_server"
-        ;;
-      *"remote port forwarding failed for listen port"*)
-        log ERROR port_forward_failed "$line" action "check_port_in_use_or_permitopen"
-        ;;
-      *"Broken pipe"*|*"Connection reset"*|*"timed out"*)
-        log WARN ssh_disconnected "$line" recovering "true"
-        ;;
-      *"Permanently added"*|*"known hosts"*)
-        log INFO ssh_known_host "$line"
-        ;;
-      *)
-        log INFO ssh "$line"
-        ;;
-    esac
-  done)
+  run_ssh > >(while IFS= read -r line; do
+	  log INFO ssh "$line"
+	done) 2> >(while IFS= read -r line; do
+	  case "$line" in
+		*"Permission denied (publickey)"*)
+		  log ERROR ssh_auth_failed "$line" action "install_public_key_on_server"
+		  ;;
+		*"remote port forwarding failed for listen port"*)
+		  log ERROR port_forward_failed "$line" action "check_port_in_use_or_permitopen"
+		  ;;
+		*"Broken pipe"*|*"Connection reset"*|*"timed out"*)
+		  log WARN ssh_disconnected "$line" recovering "true"
+		  ;;
+		*)
+		  log INFO ssh "$line"
+		  ;;
+	  esac
+	done)
 
+	
   log WARN ssh_exit "SSH tunnel exited; retrying" attempt "$attempt"
-
+  SSH_PID=$!
+  
   sleep "$backoff"
   [ "$backoff" -lt 60 ] && backoff=$((backoff * 2))
+  
+  if kill -0 "$SSH_PID" 2>/dev/null; then
+	  log INFO ssh_connected "Tunnel established successfully" \
+		server "$SERVER" remote_port "$REMOTE_PORT" local_port "$LOCAL_PORT"
+	  wait "$SSH_PID"
+  else
+	  log WARN ssh_failed "SSH exited before tunnel could establish"
+  fi
 done
