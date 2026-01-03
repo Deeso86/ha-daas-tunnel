@@ -14,6 +14,10 @@ log() {
   echo "{\"ts\":\"$(date -Is)\",\"level\":\"$level\",\"component\":\"daas_tunnel\",\"event\":\"$event\",\"msg\":\"$msg\"$kv}"
 }
 
+BOOT_ID="$(cat /proc/sys/kernel/random/uuid)"
+log INFO addon_start "DAAS tunnel add-on starting" boot_id "$BOOT_ID"
+
+
 
 set -e
 
