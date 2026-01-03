@@ -1,5 +1,5 @@
 name: DAAS Tunnel
-version: "1.0.3"
+version: "1.0.4"
 slug: daas_tunnel
 description: Persistent outbound tunnel to DAAS cloud
 
