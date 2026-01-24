@@ -6,13 +6,13 @@ set -e
 #####################################
 log() {
   level="$1"; shift
-  echo "[$(date '+%H:%M:%S')] $level: $*"
+  echo "[$(date '+%Y-%m-%d  %H:%M:%S')] $level: $*"
 }
 
 #####################################
 # Startup
 #####################################
-log INFO "DAAS tunnel add-on starting"
+log INFO "DAAS tunnel add-on starting (pid=$SSH_PID user=$SSH_USER remote_port=$REMOTE_PORT)"
 
 #####################################
 # Paths and permissions
@@ -33,6 +33,19 @@ REMOTE_PORT="$(jq -r '.remote_port' /data/options.json)"
 LOCAL_PORT="8123"
 
 log INFO "Configuration loaded (server=$SERVER user=$USER remote_port=$REMOTE_PORT)"
+
+
+
+# --- Clean shutdown handling (HA Supervisor) ---
+trap '
+  log INFO "Received SIGTERM, stopping tunnel"
+  if [ -n "${SSH_PID:-}" ] && kill -0 "$SSH_PID" 2>/dev/null; then
+    log INFO "Stopping SSH process (pid=$SSH_PID)"
+    kill "$SSH_PID"
+  fi
+  exit 0
+' TERM INT
+
 
 #####################################
 # SSH key handling (clean & quiet)
@@ -76,8 +89,12 @@ backoff=5
 while true; do
   attempt=$((attempt + 1))
   log INFO "Connecting to SSH server (attempt $attempt)"
-
-  (
+	# --- Safety: ensure no previous SSH process is still running ---
+  if [ -n "${SSH_PID:-}" ] && kill -0 "$SSH_PID" 2>/dev/null; then
+    log WARNING "Previous SSH process still running (pid=$SSH_PID), skipping restart"
+    sleep 10
+    continue
+  fi
     run_ssh \
       > >(while IFS= read -r line; do
           log INFO "$line"
@@ -100,8 +117,7 @@ while true; do
               log INFO "$line"
               ;;
           esac
-        done)
-  ) &
+        done) &
 
   SSH_PID=$!
 
@@ -109,9 +125,9 @@ while true; do
   sleep 2
 
   if kill -0 "$SSH_PID" 2>/dev/null; then
-    log INFO "Tunnel established successfully (remote port $REMOTE_PORT)"
+    log INFO "Tunnel established successfully (pid=$SSH_PID remote_port=$REMOTE_PORT)"
     wait "$SSH_PID"
-    log WARNING "Tunnel closed, reconnecting"
+    log WARNING "Tunnel closed, reconnecting (pid=$SSH_PID exit_code=$?)"
   else
     log ERROR "SSH exited before tunnel could establish"
   fi
